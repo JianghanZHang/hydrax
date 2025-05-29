@@ -51,6 +51,8 @@ class xNES(SamplingBasedController):
         es_params: EvoParams = None,
         temperature: float = 0.1,
         sigma:float = 0.3,
+        lr_sigma: float = 0.1, 
+        lr_B: float = 0.1,
         num_randomizations: int = 1,
         risk_strategy: RiskStrategy = None,
         seed: int = 0,
@@ -99,9 +101,6 @@ class xNES(SamplingBasedController):
 
             fitness_shaped = jax.nn.softmax(-fitness / temperature, axis=0)
 
-            # This will print during the XLA execution, in the correct order:
-            # jax.debug.print("  🔥 weights (softmax) =\n{}", fitness)
-
             return fitness_shaped
 
         self.strategy = EvoXNES(
@@ -113,7 +112,7 @@ class xNES(SamplingBasedController):
         )
 
         if es_params is None:
-            es_params = self.strategy.default_params.replace(std_init=sigma, lr_B=0, lr_std_init=0)
+            es_params = self.strategy.default_params.replace(std_init=sigma, lr_B=lr_B, lr_std_init=lr_sigma)
             # es_params = self.strategy.default_params.replace(std_init=sigma)
 
         self.es_params = es_params
@@ -125,12 +124,13 @@ class xNES(SamplingBasedController):
         _params = super().init_params(initial_knots, seed)
         rng, init_rng = jax.random.split(_params.rng)
 
-        jax.debug.print("Params:{}", self.es_params)
+        # jax.debug.print("Params:{}", self.es_params)
         opt_state = self.strategy.init(key = init_rng, mean=jnp.zeros(self.task.model.nu * self.num_knots), params = self.es_params)
         
         # Evosax's xNES implementation has an error when initializing B (it's det(B) is not 1), so we enforce it here!
         opt_state = opt_state.replace(B = jnp.eye(self.strategy.num_dims))
-        jax.debug.print("State:{}", opt_state)
+
+        # jax.debug.print("State:{}", opt_state)
         return EvosaxParams(
             tk=_params.tk, mean=_params.mean, opt_state=opt_state, rng=rng
         )
@@ -189,9 +189,10 @@ class xNES(SamplingBasedController):
         # #################################### Debug #########################################
         # fitness_shaped = jax.nn.softmax(-costs / 0.1, axis=0)
         
-        # has_nan = jnp.isnan(fitness_shaped).any()
-        # jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
-        #                 costs, fitness_shaped, has_nan, opt_state.mean)
+        # fitness_has_nan = jnp.isnan(fitness_shaped).any()
+        # cost_has_nan = jnp.isnan(costs).any()
+        # jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥any NaN? = {} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
+        #                 costs, cost_has_nan, fitness_shaped, fitness_has_nan, opt_state.mean)
 
         # ####################################################################################
         
