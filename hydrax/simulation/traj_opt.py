@@ -12,6 +12,7 @@ from hydrax.alg_base import Trajectory, SamplingBasedController
 import joblib
 import tqdm
 from functools import partial
+import os
 
 
 class traj_opt_helper:
@@ -58,23 +59,73 @@ class traj_opt_helper:
         self.policy_params = joblib.load("policy_params_latest.pkl")
         self.cost_list = joblib.load("costs_latest.pkl")
 
+    def trails( self,
+        max_iteration: int = 100,
+        num_trails: int = 6) -> None:
+
+        self.__warm_up()
+
+        controller_name = self.controller.__class__.__name__
+        task_name = self.controller.task.__class__.__name__
+        path = os.path.join("data", task_name)
+        try:
+            os.makedirs(path, exist_ok=True)
+            print(f"path created: {path}")
+        except Exception as e:
+            print(f'failed to crate path: {e}')
+        cost_list_list = []
+        seed_list = list(np.arange(num_trails))
+        for seed in seed_list:
+            cost_list = self.optimize(max_iteration, seed=seed)
+            cost_list_list.append(cost_list)
+        
+        
+        cost_array = np.array(cost_list_list)
+        cost_array = cost_array.mean(axis = 0)
+
+        try:
+            joblib.dump(cost_array, path + "/" + controller_name + "_costs_trails_average.pkl")
+            print("Results saved")
+        except Exception as e:
+            print(f"Failed to save results: {e}")
+
     def optimize(
         self,
         max_iteration: int = 100,
-    ) -> None:
+        seed: int = 1
+    ) -> list:
 
-        self.__warm_up()
-        policy_params = self.controller.init_params()
+        policy_params = self.controller.init_params(seed=seed)
         cost_list = []
 
         for i in tqdm.tqdm(range(max_iteration)):
             policy_params, rollouts = self.jit_optimize(self.mjx_data, policy_params)
-            trajectory_cost = jnp.sum(rollouts.costs[-1, :], axis=-1) # Take the current trajectory costs
+            trajectory_cost = jnp.sum(rollouts.costs[-1, :], axis=-1) # Take the current trajectory costs            
+            cost_list.append(trajectory_cost) # Append the cost of the current control trajectory to the list
 
-            # jax.debug.print("costs.shape{}", rollouts.costs.shape)
+        print("Optimization done.")
 
-            # jax.debug.print("trajectory costs.shape{}", trajectory_costs.shape)
-            
+        return cost_list
+    
+    def optimize_save_results(
+        self,
+        max_iteration: int = 100,
+        seed: int = 1
+    ) -> list:
+
+        self.__warm_up()
+        policy_params = self.controller.init_params(seed=seed)
+        controller_name = self.controller.__class__.__name__
+        task_name = self.controller.task.__class__.__name__
+        path = os.path.join("data", task_name)
+
+        os.makedirs(path, exist_ok=True)
+
+        cost_list = []
+
+        for i in tqdm.tqdm(range(max_iteration)):
+            policy_params, rollouts = self.jit_optimize(self.mjx_data, policy_params)
+            trajectory_cost = jnp.sum(rollouts.costs[-1, :], axis=-1) # Take the current trajectory costs            
             cost_list.append(trajectory_cost) # Append the cost of the current control trajectory to the list
 
         print("Optimization done.")
@@ -82,12 +133,14 @@ class traj_opt_helper:
         self.policy_params = policy_params
         self.rollouts = rollouts
         try:
-            joblib.dump(policy_params, "policy_params_latest.pkl")
-            joblib.dump(rollouts, "rollouts_latest.pkl")
-            joblib.dump(cost_list, "costs_latest.pkl")
+            joblib.dump(policy_params, path + "/" + controller_name + "_policy_params.pkl")
+            joblib.dump(rollouts,  path + "/" + controller_name + "_rollouts.pkl")
+            joblib.dump(cost_list, path + "/" + controller_name + "_costs.pkl")
             print("Results saved")
         except Exception as e:
             print(f"Failed to save results: {e}")
+
+        return cost_list
 
     # This function will not work (the version is too old)
     # def visualize_rollout(self, idx: int, loop: bool = True):
