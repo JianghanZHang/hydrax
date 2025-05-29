@@ -96,14 +96,26 @@ class MPPI(SamplingBasedController):
             ),
         )
         controls = params.mean + self.noise_level * noise
+
+        controls = jnp.concatenate([controls, params.mean[None, :, :]], axis=0) # Put the current controls for recording the current cost
+
         return controls, params.replace(rng=rng)
 
     def update_params(
         self, params: MPPIParams, rollouts: Trajectory
     ) -> MPPIParams:
         """Update the mean with an exponentially weighted average."""
-        costs = jnp.sum(rollouts.costs, axis=1)  # sum over time steps
+        
+        costs = jnp.sum(rollouts.costs, axis=1)[:-1]  # sum over time steps (remove the current control)
+
+
+        knots = rollouts.knots[:-1, :, :] # (remove the current control)
+
+        # costs = costs / jnp.std(costs)
         # N.B. jax.nn.softmax takes care of details like baseline subtraction.
+        
         weights = jax.nn.softmax(-costs / self.temperature, axis=0)
-        mean = jnp.sum(weights[:, None, None] * rollouts.knots, axis=0)
+
+        mean = jnp.sum(weights[:, None, None] * knots, axis=0) # weighting without the current control
+        
         return params.replace(mean=mean)
