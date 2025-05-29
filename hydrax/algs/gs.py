@@ -1,7 +1,7 @@
 from typing import Any, Literal, Tuple
 
 import evosax
-from evosax.algorithms.base import EvolutionaryAlgorithm
+from evosax.algorithms.distribution_based import Open_ES
 import jax
 import jax.numpy as jnp
 from flax.struct import dataclass
@@ -34,17 +34,14 @@ class EvosaxParams(SamplingParams):
     opt_state: EvoState
 
 
-class Evosax(SamplingBasedController):
-    """A generic controller that allows us to use any evosax optimizer.
-
-    See https://github.com/RobertTLange/evosax/ for details and a list of
-    available optimizers.
+class GaussianSmoothing(SamplingBasedController):
+    """
+    Gaussian smoothing implemented with OpenAI ES from EvoSax
     """
 
     def __init__(
         self,
         task: Task,
-        optimizer: EvolutionaryAlgorithm,
         num_samples: int,
         es_params: EvoParams = None,
         sigma=0.1,
@@ -88,28 +85,35 @@ class Evosax(SamplingBasedController):
         )
         # Using the softmax utility as in MPPI
 
-        # There is an error in EvoSax's implementation of OpenAI ES (it is doing ascent instead of descent), 
-        # so we need to reverse the sign here!
         def mppi_fitness_shaping_fn(
             population: Population, fitness: jax.Array, state: State, params: Params
             ) -> Fitness:
             
             fitness = jax.nn.softmax(-fitness / temperature, axis=0)
 
-        #     Evosax's OpenAI ES code (they should reverse the sign to make it correct)
+        #     Evosax's OpenAI-ES code:
         #     grad = jnp.dot(fitness, (population - state.mean) / state.std) / (
         #     self.population_size * state.std
         #     )
 
-        #     We multiply by (pop_size * std^2) to make the step size the same as MPPI
-            return (-num_samples * sigma**2) * fitness
+        #     We multiply by -(pop_size * std^2) to make the step size the same as MPPI
+        #     We need to also reverse the sign here!
+            return -(num_samples * sigma**2) * fitness
 
-        self.strategy = optimizer(
+        def baseline_subtraction_fitness_shaping_fn(
+            population: Population, fitness: jax.Array, state: State, params: Params
+            ) -> Fitness:
+
+            fitness = fitness - jnp.mean(fitness, axis=0)
+            return fitness
+        
+        self.strategy = Open_ES(
             population_size=num_samples,
             solution=jnp.zeros(task.model.nu * self.num_knots),
             fitness_shaping_fn = mppi_fitness_shaping_fn,
             optimizer = optax.sgd(learning_rate=1),  # Set learing rate = 1 here (the default was 1e-3)
             std_schedule= optax.constant_schedule(sigma),
+            use_antithetic_sampling = False,
             **kwargs,
         )
 
