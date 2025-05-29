@@ -19,6 +19,7 @@ Run an interactive simulation of a cart-pole swingup
 task = CartPole()
 
 # task = CubeRotation()
+
 # task = Walker()
 
 # Define the model used for simulation
@@ -60,46 +61,35 @@ arg = parser.parse_args()
 # ctrl = MPPI(
 #     task,
 #     noise_level = 0.3,
-#     temperature = 0.01, 
+#     temperature = 0.1, 
 #     num_samples=1024,
-#     plan_horizon=0.5,
-#     spline_type="cubic",
-#     num_knots=10,
-#     iterations = 1
-# )
-
-ctrl = GaussianSmoothing(
-    task,
-    sigma = 0.3,
-    temperature = 0.1, 
-    num_samples=1024,
-    plan_horizon=1.0,
-    spline_type="zero",
-    num_knots=100,
-    iterations = 1
-)
-
-# ctrl = xNES(
-#     task,
-#     num_samples=1024,
-#     temperature=0.1,
-#     sigma = 0.3,
-#     plan_horizon=1.0,
-#     spline_type="cubic",
-#     num_knots=100,
-#     iterations = 1
-# )
-
-# ctrl = CMAES(
-#     task,
-#     num_samples=1024,
-#     temperature=0.1,
-#     sigma = 0.3,
 #     plan_horizon=1.0,
 #     spline_type="zero",
 #     num_knots=100,
 #     iterations = 1
 # )
+
+# ctrl = xNES(
+#     task,
+#     sigma = 0.3,
+#     temperature = 0.1, 
+#     num_samples=1024,
+#     plan_horizon=1.0,
+#     spline_type="zero",
+#     num_knots=100,
+#     iterations = 1
+# )
+
+ctrl = CMAES(
+    task,
+    num_samples=1024,
+    temperature=0.1,
+    sigma = 0.3,
+    plan_horizon=1.0,
+    spline_type="zero",
+    num_knots=100,
+    iterations = 1
+)
 
 # ctrl = SVES(
 #     task,
@@ -116,7 +106,7 @@ ctrl = GaussianSmoothing(
 
 # Define the model used for simulation
 mj_model = task.mj_model
-mj_model.opt.timestep = 0.01
+mj_model.opt.timestep = 0.005
 mj_model.opt.iterations = 5
 mj_data = mujoco.MjData(mj_model)
 # Generate a random quaternion
@@ -128,4 +118,5 @@ if arg.v == True:
     to.load_policy()
     to.visualize_all()
 else:
-    to.optimize(max_iteration=100)
+    to.trails(max_iteration=100)
+    # to.optimize_save_result(max_iteration=100)
