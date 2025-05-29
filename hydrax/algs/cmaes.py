@@ -109,11 +109,7 @@ class CMAES(SamplingBasedController):
         """Initialize the policy parameters."""
         _params = super().init_params(initial_knots, seed)
         rng, init_rng = jax.random.split(_params.rng)
-
-        jax.debug.print("Params:{}", self.es_params)
-        
         opt_state = self.strategy.init(key = init_rng, mean=jnp.zeros(self.task.model.nu * self.num_knots), params = self.es_params)
-        jax.debug.print("State:{}", opt_state)
         return EvosaxParams(
             tk=_params.tk, mean=_params.mean, opt_state=opt_state, rng=rng
         )
@@ -168,13 +164,12 @@ class CMAES(SamplingBasedController):
         # jax.debug.print("opt_state.mean.shape:{}", opt_state.mean.shape)
         # jax.debug.print("task.u_min.shape:{}", self.task.u_min.shape)
 
-
         mean = jnp.reshape(opt_state.mean,
-            (
-            self.num_knots,
-            self.task.model.nu,
-            )
-        )
+                    (
+                    self.num_knots,
+                    self.task.model.nu,
+                    )
+                )
 
         mean = jnp.clip(
             mean, self.task.u_min, self.task.u_max
@@ -191,8 +186,10 @@ class CMAES(SamplingBasedController):
         )
 
         # jax.debug.print("x: {}", x)
-        # jax.debug.print("EvoState: {}", opt_state)
+        # jax.debug.print("mean: \n{}", opt_state.mean)
+
         
         return params.replace(mean=mean, opt_state=opt_state, rng=rng)
+    
     
 
