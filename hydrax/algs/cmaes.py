@@ -154,16 +154,12 @@ class CMAES(SamplingBasedController):
         )
 
         best_idx = jnp.argmin(costs)
-        best_knots = rollouts.knots[best_idx]
+        # best_knots = rollouts.knots[best_idx]
 
         # By default, opt_state stores the best member ever, rather than the
         # best member from the current generation. We want to just use the best
         # member from this generation, since the cost landscape is constantly
         # changing.
-
-        # jax.debug.print("opt_state.mean.shape:{}", opt_state.mean.shape)
-        # jax.debug.print("task.u_min.shape:{}", self.task.u_min.shape)
-
         mean = jnp.reshape(opt_state.mean,
                     (
                     self.num_knots,
@@ -185,10 +181,6 @@ class CMAES(SamplingBasedController):
             best_solution=x[best_idx], best_fitness=costs[best_idx], mean = opt_mean
         )
 
-        # jax.debug.print("x: {}", x)
-        # jax.debug.print("mean: \n{}", opt_state.mean)
-
-        
         return params.replace(mean=mean, opt_state=opt_state, rng=rng)
     
     
