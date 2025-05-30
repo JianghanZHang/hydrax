@@ -171,9 +171,9 @@ class CMAES(SamplingBasedController):
                     )
                 )
 
-        mean = jnp.clip(
-            mean, self.task.u_min, self.task.u_max
-            )  # (num_knots, nu)
+        # mean = jnp.clip(
+        #     mean, self.task.u_min, self.task.u_max
+        #     )  # (num_knots, nu)
         
         opt_mean = jnp.reshape(mean,
                             (

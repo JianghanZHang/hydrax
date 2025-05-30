@@ -187,12 +187,12 @@ class xNES(SamplingBasedController):
 
 
         # #################################### Debug #########################################
-        # fitness_shaped = jax.nn.softmax(-costs / 0.1, axis=0)
+        fitness_shaped = jax.nn.softmax(-costs / 0.1, axis=0)
         
-        # fitness_has_nan = jnp.isnan(fitness_shaped).any()
-        # cost_has_nan = jnp.isnan(costs).any()
-        # jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥any NaN? = {} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
-        #                 costs, cost_has_nan, fitness_shaped, fitness_has_nan, opt_state.mean)
+        fitness_has_nan = jnp.isnan(fitness_shaped).any()
+        cost_has_nan = jnp.isnan(costs).any()
+        jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥any NaN? = {} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
+                        costs, cost_has_nan, fitness_shaped, fitness_has_nan, opt_state.mean)
 
         # ####################################################################################
         
@@ -203,9 +203,9 @@ class xNES(SamplingBasedController):
             )
         )
 
-        mean = jnp.clip(
-            mean, self.task.u_min, self.task.u_max
-            )  # (num_knots, nu)
+        # mean = jnp.clip(
+        #     mean, self.task.u_min, self.task.u_max
+        #     )  # (num_knots, nu)
         
         opt_mean = jnp.reshape(mean,
                             (
