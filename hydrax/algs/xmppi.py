@@ -17,14 +17,6 @@ import optax
 EvoParams = Any
 EvoState = Any
 
-@jax.jit
-def print_weights(w):
-    jax.debug.print("🔥 weights = {}", w)
-
-@jax.jit
-def print_nan(w):
-    jax.debug.print("🔥 any NaN? = {}", jnp.isnan(w).any())
-
 @dataclass
 class EvosaxParams(SamplingParams):
     """Policy parameters for evosax optimizers.
@@ -97,7 +89,9 @@ class xMPPI(SamplingBasedController):
             population: Population, fitness: jax.Array, state: State, params: Params
             ) -> Fitness:
             
-            # fitness = fitness / jnp.std(fitness)
+            reg = (jnp.max(fitness) - jnp.min(fitness) + 1)
+
+            fitness = fitness / reg
 
             fitness_shaped = jax.nn.softmax(-fitness / temperature, axis=0)
 
@@ -187,14 +181,14 @@ class xMPPI(SamplingBasedController):
 
 
         # #################################### Debug #########################################
-        # fitness_shaped = jax.nn.softmax(-costs / 0.1, axis=0)
+        # fitness_shaped = jax.nn.softmax(-costs / 0.1 / (jnp.max(costs)-jnp.min(costs)), axis=0)
         
         # fitness_has_nan = jnp.isnan(fitness_shaped).any()
         # cost_has_nan = jnp.isnan(costs).any()
         # jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥any NaN? = {} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
         #                 costs, cost_has_nan, fitness_shaped, fitness_has_nan, opt_state.mean)
 
-        # ####################################################################################
+        # # ####################################################################################
         
         mean = jnp.reshape(opt_state.mean,
             (
