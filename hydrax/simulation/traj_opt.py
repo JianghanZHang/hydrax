@@ -73,18 +73,28 @@ class traj_opt_helper:
             print(f"path created: {path}")
         except Exception as e:
             print(f'failed to crate path: {e}')
+
+        params_list = []
         cost_list_list = []
         seed_list = list(np.arange(num_trails))
         for seed in seed_list:
-            cost_list = self.optimize(max_iteration, seed=seed)
+            cost_list, policy_params = self.optimize(max_iteration, seed=seed)
             cost_list_list.append(cost_list)
+            params_list.append(policy_params)
         
         
         cost_array = np.array(cost_list_list)
+        last_costs = cost_array[:, -1]
+
         cost_array = cost_array.mean(axis = 0)
+
+        best_idx = np.argmin(last_costs)
+        params_list[best_idx]
 
         try:
             joblib.dump(cost_array, path + "/" + controller_name + "_costs_trails_average.pkl")
+            joblib.dump(cost_array, path + "/" + controller_name + "_params_trails_best.pkl")
+
             print("Results saved")
         except Exception as e:
             print(f"Failed to save results: {e}")
@@ -93,7 +103,7 @@ class traj_opt_helper:
         self,
         max_iteration: int = 100,
         seed: int = 1
-    ) -> list:
+    ) -> tuple[list, list]:
 
         policy_params = self.controller.init_params(seed=seed)
         cost_list = []
@@ -140,7 +150,7 @@ class traj_opt_helper:
         except Exception as e:
             print(f"Failed to save results: {e}")
 
-        return cost_list
+        return cost_list, policy_params
 
     # This function will not work (the version is too old)
     # def visualize_rollout(self, idx: int, loop: bool = True):
