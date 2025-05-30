@@ -92,21 +92,9 @@ class xNES(SamplingBasedController):
             
         )
 
-        # Using the softmax utility as in MPPI
-        def lse_fitness_shaping_fn(
-            population: Population, fitness: jax.Array, state: State, params: Params
-            ) -> Fitness:
-            
-            # fitness = fitness / jnp.std(fitness)
-
-            fitness_shaped = jax.nn.softmax(-fitness / temperature, axis=0)
-
-            return fitness_shaped
-
         self.strategy = EvoXNES(
             population_size=num_samples,
             solution=jnp.zeros(task.model.nu * self.num_knots),
-            fitness_shaping_fn = lse_fitness_shaping_fn,
             optimizer = optax.sgd(learning_rate=1),  # Set learing rate = 1 here (the default was 1e-3)
             **kwargs,
         )
@@ -187,12 +175,12 @@ class xNES(SamplingBasedController):
 
 
         # #################################### Debug #########################################
-        fitness_shaped = jax.nn.softmax(-costs / 0.1, axis=0)
+        # fitness_shaped = jax.nn.softmax(-costs / 0.1, axis=0)
         
-        fitness_has_nan = jnp.isnan(fitness_shaped).any()
-        cost_has_nan = jnp.isnan(costs).any()
-        jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥any NaN? = {} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
-                        costs, cost_has_nan, fitness_shaped, fitness_has_nan, opt_state.mean)
+        # fitness_has_nan = jnp.isnan(fitness_shaped).any()
+        # cost_has_nan = jnp.isnan(costs).any()
+        # jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥any NaN? = {} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
+        #                 costs, cost_has_nan, fitness_shaped, fitness_has_nan, opt_state.mean)
 
         # ####################################################################################
         
