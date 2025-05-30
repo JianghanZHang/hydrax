@@ -111,7 +111,7 @@ class GaussianSmoothing(SamplingBasedController):
         self.strategy = Open_ES(
             population_size=num_samples,
             solution=jnp.zeros(task.model.nu * self.num_knots),
-            fitness_shaping_fn = mppi_fitness_shaping_fn,
+            fitness_shaping_fn = baseline_subtraction_fitness_shaping_fn,
             optimizer = optax.sgd(learning_rate=1),  # Set learing rate = 1 here (the default was 1e-3)
             std_schedule= optax.constant_schedule(sigma),
             use_antithetic_sampling = False,
@@ -182,12 +182,12 @@ class GaussianSmoothing(SamplingBasedController):
         # changing.
         
         #################################### Debug #########################################
-        fitness_shaped = jax.nn.softmax(-costs / 0.1, axis=0)
+        # fitness_shaped = jax.nn.softmax(-costs / 0.1, axis=0)
         
-        fitness_has_nan = jnp.isnan(fitness_shaped).any()
-        cost_has_nan = jnp.isnan(costs).any()
-        jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥any NaN? = {} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
-                        costs, cost_has_nan, fitness_shaped, fitness_has_nan, opt_state.mean)
+        # fitness_has_nan = jnp.isnan(fitness_shaped).any()
+        # cost_has_nan = jnp.isnan(costs).any()
+        # jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥any NaN? = {} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
+        #                 costs, cost_has_nan, fitness_shaped, fitness_has_nan, opt_state.mean)
 
         ####################################################################################
         
@@ -218,61 +218,3 @@ class GaussianSmoothing(SamplingBasedController):
         
         return params.replace(mean=mean, opt_state=opt_state, rng=rng)
     
-    # def update_params(
-    #     self, params: EvosaxParams, rollouts: Trajectory
-    # ) -> EvosaxParams:
-    #     """Update the policy parameters based on the rollouts."""
-    #     costs = jnp.sum(rollouts.costs, axis=1)[:-1]  # sum over time steps (remove the current control)
-    #     knots = rollouts.knots[:-1, :, :]
-
-    #     x = jnp.reshape(knots, (self.strategy.population_size, -1))
-
-    #     rng, update_rng = jax.random.split(params.rng)
-
-
-    #     opt_state, _ = self.strategy.tell(
-    #         key=update_rng, population=x, fitness=costs, state=params.opt_state, params=self.es_params
-    #     )
-
-    #     best_idx = jnp.argmin(costs)
-    #     # best_knots = rollouts.knots[best_idx]
-
-    #     # By default, opt_state stores the best member ever, rather than the
-    #     # best member from the current generation. We want to just use the best
-    #     # member from this generation, since the cost landscape is constantly
-    #     # changing.
-
-
-    #     # #################################### Debug #########################################
-    #     fitness_shaped = jax.nn.softmax(-costs / 0.1, axis=0)
-        
-    #     has_nan = jnp.isnan(fitness_shaped).any()
-    #     jax.debug.print(" \n\n\n🔥fitness = \n{} \n 🔥weights (softmax) =\n{} \n 🔥any NaN? = {} \n mean = \n {}", \
-    #                     costs, fitness_shaped, has_nan, opt_state.mean)
-
-    #     # ####################################################################################
-        
-    #     mean = jnp.reshape(opt_state.mean,
-    #         (
-    #         self.num_knots,
-    #         self.task.model.nu,
-    #         )
-    #     )
-
-    #     mean = jnp.clip(
-    #         mean, self.task.u_min, self.task.u_max
-    #         )  # (num_knots, nu)
-        
-    #     opt_mean = jnp.reshape(mean,
-    #                         (
-    #                         self.num_knots * self.task.model.nu
-    #                         )
-    #                     ) # (num_knots * nu) flat the mean for Evosax
-    
-    #     opt_state = opt_state.replace(
-    #         best_solution=x[best_idx], best_fitness=costs[best_idx], mean = opt_mean
-    #     )
-        
-    #     return params.replace(mean=mean, opt_state=opt_state, rng=rng)
-    
-
