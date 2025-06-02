@@ -1,5 +1,4 @@
 import time
-from typing import Sequence
 
 import jax
 import jax.numpy as jnp
@@ -13,7 +12,7 @@ import joblib
 import tqdm
 from functools import partial
 import os
-
+from pathlib import Path
 
 class traj_opt_helper:
     def __init__(
@@ -67,7 +66,10 @@ class traj_opt_helper:
 
         controller_name = self.controller.__class__.__name__
         task_name = self.controller.task.__class__.__name__
-        path = os.path.join("data", task_name)
+
+        base_dir = Path(__file__).parent
+
+        path = os.path.join(base_dir,"data", task_name)
         try:
             os.makedirs(path, exist_ok=True)
             print(f"path created: {path}")
@@ -75,13 +77,14 @@ class traj_opt_helper:
             print(f'failed to crate path: {e}')
 
         params_list = []
+        rollouts_list = []
         cost_list_list = []
         seed_list = list(np.arange(num_trails))
         for seed in seed_list:
-            cost_list, policy_params = self.optimize(max_iteration, seed=seed)
+            cost_list, last_policy_params, last_rollouts = self.optimize(max_iteration, seed=seed)
             cost_list_list.append(cost_list)
-            params_list.append(policy_params)
-        
+            params_list.append(last_policy_params)
+            rollouts_list.append(last_rollouts)
         
         cost_array = np.array(cost_list_list)
         last_costs = cost_array[:, -1]
@@ -89,12 +92,15 @@ class traj_opt_helper:
         cost_array = cost_array.mean(axis = 0)
 
         best_idx = np.argmin(last_costs)
-        params_list[best_idx]
-
+        best_params = params_list[best_idx]
+        best_rollout = rollouts_list[best_idx]
+        best_ctrls = best_rollout.controls[-1]
+        
         try:
             joblib.dump(cost_array, path + "/" + controller_name + "_costs_trails_average.pkl")
-            joblib.dump(cost_array, path + "/" + controller_name + "_params_trails_best.pkl")
-
+            joblib.dump(best_params, path + "/" + controller_name + "_trails_best_params.pkl")
+            joblib.dump(best_rollout, path + "/" + controller_name + "_trails_best_rollouts.pkl")
+            joblib.dump(best_ctrls, path + "/" + controller_name + "_trails_best_ctrls.pkl")
             print("Results saved")
         except Exception as e:
             print(f"Failed to save results: {e}")
@@ -103,7 +109,7 @@ class traj_opt_helper:
         self,
         max_iteration: int = 100,
         seed: int = 1
-    ) -> tuple[list, list]:
+    ) -> list[list, list, Trajectory]:
 
         policy_params = self.controller.init_params(seed=seed)
         cost_list = []
@@ -115,7 +121,7 @@ class traj_opt_helper:
 
         print("Optimization done.")
 
-        return cost_list
+        return cost_list, policy_params, rollouts
     
     def optimize_save_results(
         self,
@@ -127,7 +133,8 @@ class traj_opt_helper:
         policy_params = self.controller.init_params(seed=seed)
         controller_name = self.controller.__class__.__name__
         task_name = self.controller.task.__class__.__name__
-        path = os.path.join("data", task_name)
+        base_dir = Path(__file__).parent
+        path = os.path.join(base_dir,"data", task_name)
 
         os.makedirs(path, exist_ok=True)
 
@@ -150,36 +157,47 @@ class traj_opt_helper:
         except Exception as e:
             print(f"Failed to save results: {e}")
 
-        return cost_list, policy_params
+        return cost_list
 
-    # This function will not work (the version is too old)
-    # def visualize_rollout(self, idx: int, loop: bool = True):
-    #     """
-    #     visualize only single rollout
-    #     """
-    #     self.__create_temporary_viewer()
-    #     i = 0
-    #     while self.viewer.is_running():
-    #         start_time = time.perf_counter()
+    def visualize_rollout(self, task,
+                          controller):
+        
+        self.__create_temporary_viewer()
 
-    #         # Step the simulation
-    #         t = i * self.mj_model.opt.timestep
-    #         u = self.controller.get_action(idx, self.policy_params, t)
-    #         self.tmp_mj_data.ctrl[:] = np.array(u)
-    #         mujoco.mj_step(self.mj_model, self.tmp_mj_data)
-    #         self.viewer.sync()
+        controller_name = controller.__class__.__name__
+        task_name = task.__class__.__name__
 
-    #         # Try to run in roughly realtime
-    #         elapsed_time = time.perf_counter() - start_time
-    #         if elapsed_time < self.mj_model.opt.timestep:
-    #             time.sleep(self.mj_model.opt.timestep - elapsed_time)
-    #         i += 1
-    #         if i == self.controller.task.planning_horizon * self.controller.task.sim_steps_per_control_step:
-    #             self.__reset_tmp_data()
-    #             if loop:
-    #                 i = 0
-    #             else:
-    #                 return
+        base_dir = Path(__file__).parent
+
+        path = os.path.join(base_dir,"data", task_name)
+
+        file_name = path + "/" + controller_name + "_trails_best_ctrls.pkl"
+
+        controls = joblib.load(file_name)
+        i = 0
+        horizon = controls.shape[0]
+        dt = float(self.mj_model.opt.timestep)
+
+        i = 0
+        while self.viewer.is_running():
+            t_start = time.time()
+
+            # apply control and step
+            self.tmp_mj_data.ctrl[:] = controls[i]
+            mujoco.mj_step(self.mj_model, self.tmp_mj_data)
+            self.viewer.sync()
+
+            # sleep the remainder of dt to approximate real time
+            elapsed = time.time() - t_start
+            to_sleep = dt - elapsed
+            if to_sleep > 0:
+                time.sleep(to_sleep)
+
+            i += 1
+            if i == horizon:
+                i = 0
+                self.__reset_tmp_data()
+
 
     def __create_temporary_viewer(self):
         if self.viewer is None:
