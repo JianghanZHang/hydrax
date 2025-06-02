@@ -122,9 +122,14 @@ class CEM(SamplingBasedController):
             if explore_shape[0] > 0
             else jnp.empty(explore_shape)
         )
+        
 
         # Combine both sets of controls
         controls = jnp.concatenate([main_controls, explore_controls])
+
+        # Add current control the samples for recoding the costs
+        controls = jnp.concatenate([controls, params.mean[None, :, :]], axis = 0) 
+
         return controls, params.replace(rng=rng)
 
     def update_params(
@@ -132,6 +137,12 @@ class CEM(SamplingBasedController):
     ) -> CEMParams:
         """Update the mean with an exponentially weighted average."""
         costs = jnp.sum(rollouts.costs, axis=1)  # sum over time steps
+        
+        # Remove the costs of the current trajectory when updating, 
+        # this will not affect the indexing as the costs of the current is the last element!
+        costs = costs[:-1] 
+
+        # jax.debug.print("rollouts.knots.shape:{}", rollouts.knots.shape)
 
         # Sort the costs and get the indices of the elites.
         indices = jnp.argsort(costs)

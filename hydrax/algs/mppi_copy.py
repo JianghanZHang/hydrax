@@ -10,8 +10,8 @@ from hydrax.task_base import Task
 
 
 @dataclass
-class PSParams(SamplingParams):
-    """Policy parameters for predictive sampling.
+class MPPIParams(SamplingParams):
+    """Policy parameters for model-predictive path integral control.
 
     Same as SamplingParams, but with a different name for clarity.
 
@@ -22,14 +22,21 @@ class PSParams(SamplingParams):
     """
 
 
-class PredictiveSampling(SamplingBasedController):
-    """A simple implementation of https://arxiv.org/abs/2212.00541."""
+class MPPI(SamplingBasedController):
+    """Model-predictive path integral control.
+
+    Implements "MPPI-generic" as described in https://arxiv.org/abs/2409.07563.
+    Unlike the original MPPI derivation, this does not assume stochastic,
+    control-affine dynamics or a separable cost function that is quadratic in
+    control.
+    """
 
     def __init__(
         self,
         task: Task,
         num_samples: int,
         noise_level: float,
+        temperature: float,
         num_randomizations: int = 1,
         risk_strategy: RiskStrategy = None,
         seed: int = 0,
@@ -42,8 +49,10 @@ class PredictiveSampling(SamplingBasedController):
 
         Args:
             task: The dynamics and cost for the system we want to control.
-            num_samples: The number of control tapes to sample.
+            num_samples: The number of control sequences to sample.
             noise_level: The scale of Gaussian noise to add to sampled controls.
+            temperature: The temperature parameter λ. Higher values take a more
+                         even average over the samples.
             num_randomizations: The number of domain randomizations to use.
             risk_strategy: How to combining costs from different randomizations.
                            Defaults to average cost.
@@ -66,15 +75,16 @@ class PredictiveSampling(SamplingBasedController):
         )
         self.noise_level = noise_level
         self.num_samples = num_samples
+        self.temperature = temperature
 
     def init_params(
         self, initial_knots: jax.Array = None, seed: int = 0
-    ) -> PSParams:
+    ) -> MPPIParams:
         """Initialize the policy parameters."""
         _params = super().init_params(initial_knots, seed)
-        return PSParams(tk=_params.tk, mean=_params.mean, rng=_params.rng)
+        return MPPIParams(tk=_params.tk, mean=_params.mean, rng=_params.rng)
 
-    def sample_knots(self, params: PSParams) -> Tuple[jax.Array, PSParams]:
+    def sample_knots(self, params: MPPIParams) -> Tuple[jax.Array, MPPIParams]:
         """Sample a control sequence."""
         rng, sample_rng = jax.random.split(params.rng)
         noise = jax.random.normal(
@@ -87,22 +97,26 @@ class PredictiveSampling(SamplingBasedController):
         )
         controls = params.mean + self.noise_level * noise
 
-        # The original mean of the distribution is included as a sample
-        controls = controls.at[0].set(params.mean)
-
-        # Add current control the samples for recoding the costs
-        controls = jnp.concatenate([controls, params.mean[None, :, :]], axis=0) 
+        controls = jnp.concatenate([controls, params.mean[None, :, :]], axis=0) # Put the current controls for recording the current cost
 
         return controls, params.replace(rng=rng)
 
-    def update_params(self, params: PSParams, rollouts: Trajectory) -> PSParams:
-        """Update the policy parameters by choosing the lowest-cost rollout."""
-        costs = jnp.sum(rollouts.costs, axis=1)  # sum over time steps
+    def update_params(
+        self, params: MPPIParams, rollouts: Trajectory
+    ) -> MPPIParams:
+        """Update the mean with an exponentially weighted average."""
 
-        # Remove the costs of the current trajectory when updating, 
-        # this will not affect the indexing as the costs of the current is the last element!
-        costs = costs[:-1] 
 
-        best_idx = jnp.argmin(costs)
-        mean = rollouts.knots[best_idx]
+        costs = jnp.sum(rollouts.costs, axis=1)[:-1]  # sum over time steps (remove the current control)
+
+
+        knots = rollouts.knots[:-1, :, :] # (remove the current control)
+
+        # costs = costs / jnp.std(costs)
+        # N.B. jax.nn.softmax takes care of details like baseline subtraction.
+        
+        weights = jax.nn.softmax(-costs / self.temperature, axis=0)
+
+        mean = jnp.sum(weights[:, None, None] * knots, axis=0) # weighting without the current control
+        
         return params.replace(mean=mean)
