@@ -1,6 +1,6 @@
-name: hydrax
+name: hydrax_traj_opt
 channels:
-  - nvidia/label/cuda-12.3.0
+  - nvidia/label/cuda-12.4.0
   - conda-forge
 dependencies:
   - cuda
