@@ -203,7 +203,12 @@ class traj_opt_helper:
                 i = 0
                 self.__reset_tmp_data()
 
+    def get_path(self):
+        task_name = self.controller.task.__class__.__name__
+        base_dir = Path(__file__).parent
+        path = os.path.join(base_dir,"data", task_name) + "/"
 
+        return path
     def __create_temporary_viewer(self):
         if self.viewer is None:
             self.tmp_mj_data = copy.copy(self.mj_data)
