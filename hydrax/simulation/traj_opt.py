@@ -8,6 +8,7 @@ import numpy as np
 from mujoco import mjx
 import copy
 from hydrax.alg_base import Trajectory, SamplingBasedController
+import equinox
 import joblib
 import tqdm
 from functools import partial
@@ -39,6 +40,7 @@ class traj_opt_helper:
 
         # initialize the controller
         jit_optimize = jax.jit(partial(controller.optimize), donate_argnums=(1,))
+        # jit_optimize = equinox.filter_jit(partial(controller.optimize))
         self.jit_optimize = jit_optimize
 
     def __warm_up(self):
@@ -61,6 +63,9 @@ class traj_opt_helper:
     def trails( self,
         max_iteration: int = 100,
         num_trails: int = 6) -> None:
+
+        print(f"Controller dt: {self.controller.dt}")
+        print(f"Simulator dt: {self.mj_model.opt.timestep}")
 
         self.__warm_up()
 
