@@ -89,9 +89,9 @@ class xMPPI(SamplingBasedController):
             population: Population, fitness: jax.Array, state: State, params: Params
             ) -> Fitness:
             
-            reg = (jnp.max(fitness) - jnp.min(fitness) + 1)
+            # reg = (jnp.std(fitness)) + 1
 
-            fitness = fitness / reg
+            # fitness = fitness / reg
 
             fitness_shaped = jax.nn.softmax(-fitness / temperature, axis=0)
 
