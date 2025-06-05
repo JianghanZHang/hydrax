@@ -13,7 +13,7 @@ class CartPoleUnconstrained(Task):
     def __init__(self) -> None:
         """Load the MuJoCo model and set task parameters."""
         mj_model = mujoco.MjModel.from_xml_path(
-            ROOT + "/models/cart_pole/scene.xml"
+            ROOT + "/models/cart_pole_unconstrained/scene.xml"
         )
         super().__init__(mj_model, trace_sites=["tip"])
 
