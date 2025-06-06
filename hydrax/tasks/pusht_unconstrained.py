@@ -9,7 +9,7 @@ from hydrax import ROOT
 from hydrax.task_base import Task
 
 
-class PushT(Task):
+class PushTUnconstrained(Task):
     """Push a T-shaped block to a desired pose."""
 
     def __init__(self) -> None:
@@ -56,7 +56,7 @@ class PushT(Task):
         close_to_block_cost = jnp.sum(jnp.square(close_to_block_err))
         control_cost = jnp.sum(jnp.square(control))
 
-        return position_cost + orientation_cost + 0.01 * close_to_block_cost + 0.01 * control_cost
+        return position_cost + orientation_cost + 0.01 * close_to_block_cost + 0.1 * control_cost
 
     def terminal_cost(self, state: mjx.Data) -> jax.Array:
         """The terminal cost ℓ_T(x_T)."""

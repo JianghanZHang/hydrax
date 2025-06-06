@@ -28,7 +28,7 @@ class CartPoleUnconstrained(Task):
         theta_cost = self._distance_to_upright(state)
         centering_cost = jnp.sum(jnp.square(state.qpos[0]))
         velocity_cost = 0.01 * jnp.sum(jnp.square(state.qvel))
-        control_cost = 0.1 * jnp.sum(jnp.square(control)) # Change control cost weight from 0.01 to 0.1
+        control_cost = 0.5 * jnp.sum(jnp.square(control)) # Change control cost weight from 0.01 to 0.5
         return theta_cost + centering_cost + velocity_cost + control_cost
 
     def terminal_cost(self, state: mjx.Data) -> jax.Array:
