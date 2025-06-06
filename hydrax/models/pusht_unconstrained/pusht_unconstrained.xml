@@ -2,7 +2,7 @@
   <option timestep="0.01" iterations="1" ls_iterations="4" />
 
   <default>
-    <velocity ctrllimited="false" kv="0.1"/>
+    <velocity kv="0.1"/>
     <default class="goal">
       <geom conaffinity="0" contype="0" rgba="0 1 0 0.2"/>
     </default>
