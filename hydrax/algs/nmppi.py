@@ -45,6 +45,7 @@ class nMPPI(SamplingBasedController):
         temperature: float = 0.1,
         sigma: float = 0.3,
         lr_cov: float = 1.0,
+        lr_mean: float = 1.0,
         num_randomizations: int = 1,
         risk_strategy: RiskStrategy = None,
         seed: int = 0,
@@ -112,8 +113,8 @@ class nMPPI(SamplingBasedController):
             es_params = self.strategy.default_params.replace(std_init=sigma, 
                                                              c_1 = 0,
                                                              c_std = 0,
-                                                             c_mu = 0,
-                                                             c_mean = 1,
+                                                             c_mu = lr_cov,
+                                                             c_mean = lr_mean,
                                                              weights = jnp.ones(task.model.nu * self.num_knots)/(task.model.nu * self.num_knots),
 
                                                              # This 2 parameters are useless

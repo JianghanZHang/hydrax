@@ -7,5 +7,8 @@ from .cmaes import CMAES
 from .sves import SVES
 from .gs import GaussianSmoothing
 from .xmppi import xMPPI
+from .nmppi import nMPPI
 
-__all__ = ["CEM", "MPPI", "PredictiveSampling", "Evosax", "xNES", "CMAES", "SVES", "GaussianSmoothing", "xMPPI"]
+__all__ = ["CEM", "MPPI", "PredictiveSampling", "Evosax", 
+           "xNES", "CMAES", "SVES", "GaussianSmoothing",
+           "xMPPI", "nMPPI"]
