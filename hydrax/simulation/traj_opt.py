@@ -39,7 +39,7 @@ class traj_opt_helper:
         self.viewer = None
 
         # initialize the controller
-        jit_optimize = jax.jit(partial(controller.optimize), donate_argnums=(1,))
+        jit_optimize = jax.jit(partial(controller.optimize))
         self.jit_optimize = jit_optimize
 
     def __warm_up(self):
@@ -139,22 +139,53 @@ class traj_opt_helper:
         policy_params = self.controller.init_params(seed=seed)
         mean_knots = policy_params.mean 
 
-        trajectory_cost = self.get_cost(mean_knots[None, ...])
-        cost_list.append(trajectory_cost) # Initial cost
+        knots_list.append(mean_knots)
         
-        trajectory_cost = self.get_cost(mean_knots[None, ...])
+        # trajectory_cost = self.get_cost(mean_knots[None, ...])
+        
         for i in tqdm.tqdm(range(max_iteration)):
             policy_params, rollouts = self.jit_optimize(self.mjx_data, policy_params)
 
-            mean_knots = policy_params.mean 
-            trajectory_cost = self.get_cost(mean_knots[None, ...])
+            mean_knots = policy_params.mean
+            knots_list.append(mean_knots)
 
-            cost_list.append(trajectory_cost) # Append the cost of the current control trajectory to the list
+            # trajectory_cost = jnp.sum(rollouts.costs[-1, :], axis=-1) # Take the current trajectory costs            
+            # cost_list.append(trajectory_cost) # Append the cost of the current control trajectory to the list
+            
+        costs_list = self.get_cost_list(knots_list)
 
+        # assert (np.array(costs_list[:-1]) == np.array(cost_list)).all()
         print("Optimization done.")
 
-        return cost_list, policy_params, rollouts
+        return costs_list, policy_params, rollouts
     
+    def get_cost_list(
+        self,
+        knots_list: list,
+    ) -> list:
+
+        ctrl = self.controller
+        task = self.controller.task
+
+        knots = jnp.array(knots_list)      
+
+        tk = (
+            jnp.linspace(0.0, ctrl.plan_horizon, self.num_knots) + self.mjx_data.time
+        )
+
+        tq = jnp.linspace(tk[0], tk[-1], ctrl.ctrl_steps)
+        controls = ctrl.interp_func(tq, tk, knots)
+
+        print(f'mean controls from get_cost_list:{controls}')
+
+        state = self.mjx_data
+        _, rollouts = ctrl.eval_rollouts(task.model, state, controls, knots)
+
+        costs = jnp.sum(rollouts.costs, axis=-1)
+
+        return list(costs)
+        
+
     def get_cost(
         self,
         knots: jax.Array,
@@ -166,7 +197,6 @@ class traj_opt_helper:
         tk = jnp.linspace(0.0, ctrl.plan_horizon, ctrl.num_knots)
         tq = jnp.linspace(tk[0], tk[-1], ctrl.ctrl_steps)
         controls = ctrl.interp_func(tq, tk, knots)
-
 
         state = self.mjx_data
         _, rollouts = ctrl.eval_rollouts(task.model, state, controls, knots)
