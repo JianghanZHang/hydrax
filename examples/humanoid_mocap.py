@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--reference_filename",
     type=str,
-    default="Lafan1/mocap/UnitreeG1/walk1_subject1.npz",
+    default="Lafan1/mocap/UnitreeG1/jumps1_subject2.npz",
     help="Reference mocap file name, from https://huggingface.co/datasets/robfiras/loco-mujoco-datasets/tree/main.",
 )
 parser.add_argument(
@@ -40,7 +40,7 @@ task = HumanoidMocap(reference_filename=args.reference_filename)
 # Set up the controller
 ctrl = CEM(
     task,
-    num_samples=512,
+    num_samples=1024,
     num_elites=20,
     sigma_start=0.2,
     sigma_min=0.05,
@@ -53,7 +53,7 @@ ctrl = CEM(
 
 # Define the model used for simulation
 mj_model = task.mj_model
-mj_model.opt.timestep = 0.01
+mj_model.opt.timestep = 0.02
 mj_model.opt.iterations = 10
 mj_model.opt.ls_iterations = 50
 mj_model.opt.o_solimp = [0.9, 0.95, 0.001, 0.5, 2]
@@ -73,7 +73,7 @@ run_interactive(
     ctrl,
     mj_model,
     mj_data,
-    frequency=100,
+    frequency=50,
     show_traces=False,
     reference=reference,
     reference_fps=task.reference_fps,
