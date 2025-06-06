@@ -40,7 +40,6 @@ class traj_opt_helper:
 
         # initialize the controller
         jit_optimize = jax.jit(partial(controller.optimize), donate_argnums=(1,))
-        # jit_optimize = equinox.filter_jit(partial(controller.optimize))
         self.jit_optimize = jit_optimize
 
     def __warm_up(self):
@@ -128,6 +127,53 @@ class traj_opt_helper:
 
         return cost_list, policy_params, rollouts
     
+    def opt(
+        self,
+        max_iteration: int = 100,
+        seed: int = 1
+    ) -> list[list, list, Trajectory]:
+
+        cost_list = []
+        knots_list = [] 
+    
+        policy_params = self.controller.init_params(seed=seed)
+        mean_knots = policy_params.mean 
+
+        trajectory_cost = self.get_cost(mean_knots[None, ...])
+        cost_list.append(trajectory_cost) # Initial cost
+        
+        trajectory_cost = self.get_cost(mean_knots[None, ...])
+        for i in tqdm.tqdm(range(max_iteration)):
+            policy_params, rollouts = self.jit_optimize(self.mjx_data, policy_params)
+
+            mean_knots = policy_params.mean 
+            trajectory_cost = self.get_cost(mean_knots[None, ...])
+
+            cost_list.append(trajectory_cost) # Append the cost of the current control trajectory to the list
+
+        print("Optimization done.")
+
+        return cost_list, policy_params, rollouts
+    
+    def get_cost(
+        self,
+        knots: jax.Array,
+    ) -> list:
+
+        ctrl = self.controller
+        task = self.controller.task
+
+        tk = jnp.linspace(0.0, ctrl.plan_horizon, ctrl.num_knots)
+        tq = jnp.linspace(tk[0], tk[-1], ctrl.ctrl_steps)
+        controls = ctrl.interp_func(tq, tk, knots)
+
+
+        state = self.mjx_data
+        _, rollouts = ctrl.eval_rollouts(task.model, state, controls, knots)
+
+        return jnp.sum(rollouts.costs[0, :], axis=-1)
+        
+        
     def optimize_save_results(
         self,
         max_iteration: int = 100,
